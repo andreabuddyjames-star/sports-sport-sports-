@@ -1,23 +1,65 @@
-"""External live-data providers with normalized, safe application payloads."""
+"""Cached, retried provider service with normalized application payloads."""
 from datetime import datetime, timezone
 import os
+import threading
+import time
 import requests
+
+_CACHE = {}
+_CACHE_LOCK = threading.Lock()
+_STATS = {"requests": 0, "successes": 0, "failures": 0, "cache_hits": 0, "last_error": None}
 
 
 def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _get_json(url, **kwargs):
-    response = requests.get(url, timeout=float(os.getenv("API_TIMEOUT_SECONDS", "8")), **kwargs)
-    response.raise_for_status()
-    return response.json()
+def _ttl():
+    try:
+        return max(0, int(os.getenv("PROVIDER_CACHE_SECONDS", "120")))
+    except ValueError:
+        return 120
+
+
+def _get_json(url, *, cache_key=None, **kwargs):
+    key = cache_key or url + repr(sorted(kwargs.items(), key=str))
+    with _CACHE_LOCK:
+        cached = _CACHE.get(key)
+        if cached and time.time() - cached["created"] < _ttl():
+            _STATS["cache_hits"] += 1
+            return cached["value"]
+
+    attempts = max(1, int(os.getenv("PROVIDER_RETRIES", "2")) + 1)
+    timeout = float(os.getenv("API_TIMEOUT_SECONDS", "8"))
+    last_error = None
+    for attempt in range(attempts):
+        try:
+            with _CACHE_LOCK:
+                _STATS["requests"] += 1
+            response = requests.get(url, timeout=timeout, **kwargs)
+            response.raise_for_status()
+            value = response.json()
+            with _CACHE_LOCK:
+                _CACHE[key] = {"created": time.time(), "value": value}
+                _STATS["successes"] += 1
+            return value
+        except (requests.RequestException, ValueError, TypeError) as error:
+            last_error = str(error)
+            if attempt < attempts - 1:
+                time.sleep(min(0.25 * (2 ** attempt), 1.0))
+    with _CACHE_LOCK:
+        _STATS["failures"] += 1
+        _STATS["last_error"] = last_error
+    raise requests.RequestException(last_error or "provider request failed")
 
 
 def provider_status():
     return {
-        "injuries": {"provider": "API-Football" if os.getenv("API_FOOTBALL_KEY") else "ESPN News fallback", "configured": bool(os.getenv("API_FOOTBALL_KEY"))},
-        "weather": {"provider": "WeatherAPI.com" if os.getenv("WEATHER_API_KEY") else "Open-Meteo", "configured": bool(os.getenv("WEATHER_API_KEY"))},
+        "injuries": {"provider": "API-Football" if os.getenv("API_FOOTBALL_KEY") else "ESPN News fallback", "configured": bool(os.getenv("API_FOOTBALL_KEY")), "mode": "structured" if os.getenv("API_FOOTBALL_KEY") else "fallback"},
+        "weather": {"provider": "WeatherAPI.com" if os.getenv("WEATHER_API_KEY") else "Open-Meteo", "configured": bool(os.getenv("WEATHER_API_KEY")), "mode": "keyed" if os.getenv("WEATHER_API_KEY") else "fallback"},
+        "cache_seconds": _ttl(),
+        "retry_attempts": max(1, int(os.getenv("PROVIDER_RETRIES", "2")) + 1),
+        "stats": {key: value for key, value in _STATS.items() if key != "last_error"},
     }
 
 
@@ -27,7 +69,7 @@ def injuries_for(event, home, away):
     try:
         if os.getenv("API_FOOTBALL_KEY") and event == "soccer":
             base = os.getenv("API_FOOTBALL_BASE_URL", "https://v3.football.api-sports.io").rstrip("/")
-            payload = _get_json(f"{base}/injuries", headers={"x-apisports-key": os.environ["API_FOOTBALL_KEY"]}, params={"league": os.getenv("API_FOOTBALL_LEAGUE_ID", "39"), "season": os.getenv("API_FOOTBALL_SEASON", "2025")})
+            payload = _get_json(f"{base}/injuries", cache_key=f"injuries:{home}:{away}", headers={"x-apisports-key": os.environ["API_FOOTBALL_KEY"]}, params={"league": os.getenv("API_FOOTBALL_LEAGUE_ID", "39"), "season": os.getenv("API_FOOTBALL_SEASON", "2025")})
             for item in payload.get("response", []):
                 team = item.get("team", {}).get("name", "")
                 target = next((name for name in reports if team and (name.lower() in team.lower() or team.lower() in name.lower())), None)
@@ -37,7 +79,7 @@ def injuries_for(event, home, away):
         else:
             endpoint = os.getenv("ESPN_SOCCER_NEWS_URL" if event == "soccer" else "ESPN_BASKETBALL_NEWS_URL", "")
             if endpoint:
-                payload = _get_json(endpoint)
+                payload = _get_json(endpoint, cache_key=f"news:{event}")
                 keywords = ("injur", "out", "sidelined", "doubt", "illness", "surgery", "suspension")
                 for article in payload.get("articles", []):
                     text = f"{article.get('headline', '')} {article.get('description', '')}".lower()
@@ -55,15 +97,15 @@ def weather_for(fixture):
     try:
         venue = fixture.get("venue", "")
         if os.getenv("WEATHER_API_KEY"):
-            payload = _get_json(os.getenv("WEATHER_API_URL", "https://api.weatherapi.com/v1/current.json"), params={"key": os.environ["WEATHER_API_KEY"], "q": venue, "aqi": "no"})
+            payload = _get_json(os.getenv("WEATHER_API_URL", "https://api.weatherapi.com/v1/current.json"), cache_key=f"weather:keyed:{venue}", params={"key": os.environ["WEATHER_API_KEY"], "q": venue, "aqi": "no"})
             location, current = payload["location"], payload["current"]
             weather = {"temperature": current.get("temp_c"), "feels_like": current.get("feelslike_c"), "precipitation": current.get("precip_mm"), "wind_speed": current.get("wind_kph"), "condition": current.get("condition", {}).get("text"), "location": location.get("name"), "icon": current.get("condition", {}).get("icon")}
             source = "WeatherAPI.com"
         else:
-            geo = _get_json(os.getenv("WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"), params={"name": venue, "count": 1, "format": "json"}).get("results", [])
+            geo = _get_json(os.getenv("WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"), cache_key=f"geo:{venue}", params={"name": venue, "count": 1, "format": "json"}).get("results", [])
             if not geo: raise ValueError("venue not found")
             location = geo[0]
-            current = _get_json(os.getenv("WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"), params={"latitude": location["latitude"], "longitude": location["longitude"], "current": "temperature_2m,precipitation,wind_speed_10m,weather_code", "timezone": "UTC"}).get("current", {})
+            current = _get_json(os.getenv("WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"), cache_key=f"weather:open:{location['latitude']}:{location['longitude']}", params={"latitude": location["latitude"], "longitude": location["longitude"], "current": "temperature_2m,precipitation,wind_speed_10m,weather_code", "timezone": "UTC"}).get("current", {})
             weather = {"temperature": current.get("temperature_2m"), "feels_like": None, "precipitation": current.get("precipitation"), "wind_speed": current.get("wind_speed_10m"), "condition": f"Weather code {current.get('weather_code', '—')}", "location": location.get("name"), "icon": None}
             source = "Open-Meteo"
         wind, rain = float(weather.get("wind_speed") or 0), float(weather.get("precipitation") or 0)
@@ -76,8 +118,5 @@ def weather_for(fixture):
 
 def live_factors(event, fixture):
     factors = injuries_for(event, fixture["home"], fixture["away"])
-    if event == "soccer" and fixture.get("venue"):
-        factors.update(weather_for(fixture))
-    else:
-        factors.update({"weather": None, "weather_penalty": 0, "weather_severity": "not-applicable", "weather_checked_at": now(), "weather_source": "not applicable"})
+    factors.update(weather_for(fixture) if event == "soccer" and fixture.get("venue") else {"weather": None, "weather_penalty": 0, "weather_severity": "not-applicable", "weather_checked_at": now(), "weather_source": "not applicable"})
     return factors
