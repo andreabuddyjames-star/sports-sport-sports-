@@ -1,44 +1,229 @@
-# sports-sport-sports-
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #081225 0%, #111827 100%);
+  color: #e5e7eb;
+}
 
-A real-time sports event prediction dashboard prototype for soccer, basketball, and tennis matchups.
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
 
-## What this project does
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 28px;
+  gap: 20px;
+}
 
-This app simulates live event predictions and displays:
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-- a matchup between two competitors
-- projected score
-- win probabilities
-- confidence level
-- live-updating event selection
-- performance factors such as attack, defense, and momentum
+select,
+button {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 14px;
+}
 
-## Stack
+select {
+  background: rgba(15, 23, 42, 0.88);
+  color: #e5e7eb;
+  padding: 12px 14px;
+}
 
-- Python 3
-- Flask
-- HTML/CSS/JavaScript
+button {
+  background: #4f46e5;
+  border: none;
+  color: white;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
 
-## Run locally
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #a5b4fc;
+}
 
-1. Create a virtual environment:
-   python -m venv .venv
-2. Activate it:
-   - macOS/Linux: source .venv/bin/activate
-   - Windows: .venv\Scripts\activate
-3. Install dependencies:
-   pip install -r requirements.txt
-4. Start the app:
-   python app.py
-5. Open:
-   http://localhost:5000
+h1 {
+  margin: 8px 0 0;
+  font-size: clamp(2rem, 3vw, 3rem);
+}
 
-## Notes
+.layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 20px;
+}
 
-This is an MVP starter for a real-time event prediction platform. It can be extended with:
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
 
-- real sports APIs
-- a machine learning model
-- authentication and user accounts
-- database storage
-- deployment to cloud hosting
+.card,
+.panel {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.fixture-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fixture-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  text-align: left;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #e5e7eb;
+  border-radius: 12px;
+  padding: 12px 14px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.fixture-item.active {
+  border-color: rgba(96, 165, 250, 0.8);
+  background: rgba(30, 64, 175, 0.25);
+}
+
+.fixture-name {
+  font-weight: 700;
+}
+
+.fixture-meta,
+.league,
+.timestamp {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.spotlight {
+  min-height: 260px;
+}
+
+.event-tag {
+  display: inline-block;
+  background: rgba(79, 70, 229, 0.18);
+  color: #b8c0ff;
+  border: 1px solid rgba(129, 140, 248, 0.4);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.matchup {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.label,
+.mini-label {
+  display: block;
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+h2 {
+  margin: 8px 0 0;
+  font-size: clamp(1.6rem, 2vw, 2.5rem);
+}
+
+.versus {
+  font-size: 1.2rem;
+  color: #a5b4fc;
+  font-weight: 700;
+}
+
+.score-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: clamp(2.2rem, 3vw, 3.4rem);
+  margin: 32px 0 24px;
+}
+
+.confidence-wrap {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1rem;
+  color: #cbd5e1;
+}
+
+.probability-item {
+  display: flex;
+  justify-content: space-between;
+  margin: 18px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.outcome {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #7dd3fc;
+  margin: 20px 0 6px;
+}
+
+.insights {
+  margin-top: 22px;
+}
+
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(90px, 1fr));
+  gap: 18px;
+  margin-top: 16px;
+}
+
+.insight-grid div {
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .insight-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+  }
+
+  header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+}
