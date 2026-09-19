@@ -109,7 +109,7 @@ def predict():
     fixture_id = request.args.get("fixture_id")
     fixture = fixture_by_id(event, fixture_id) if fixture_id else None
     fixture = fixture or random.choice(live_fixtures(event))
-    result = predict_match(event, fixture["home"], fixture["away"])
+    result = predict_match(event, fixture["home"], fixture["away"], fixture.get("league"))
     result.update({"event": event, "fixture_id": fixture["id"], "league": fixture["league"], "source": fixture["source"]})
 
     with db_connection() as connection:
