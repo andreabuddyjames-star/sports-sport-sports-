@@ -66,7 +66,6 @@ def _load_ratings():
             "leagues": payload.get("leagues", {}),
         }
     except (OSError, TypeError, ValueError):
-        # A bad optional ratings file must not take down the public API.
         pass
     return _RATINGS_CACHE
 
@@ -137,7 +136,6 @@ def match_probabilities(event, home_rate, away_rate, league=None):
         "draw": draw / total,
         "away": away_win / total,
     }
-    # League draw rates act as a gentle prior, while Poisson remains the main signal.
     if config["draw_blend"] and event == "soccer":
         target_draw = max(0.0, min(0.8, float(config["draw_rate"])))
         blended_draw = (1 - config["draw_blend"]) * probabilities["draw"] + config["draw_blend"] * target_draw
