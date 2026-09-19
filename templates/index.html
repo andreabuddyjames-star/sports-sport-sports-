@@ -1,8 +1,12 @@
 from flask import Flask, render_template, jsonify, request
+import os
 import random
+import sqlite3
 from datetime import datetime
 
 app = Flask(__name__)
+
+DB_PATH = os.path.join(app.root_path, "predictions.db")
 
 EVENT_CONFIG = {
     "soccer": {
@@ -59,6 +63,35 @@ FIXTURES = {
 }
 
 
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event TEXT NOT NULL,
+            league TEXT,
+            fixture_id TEXT,
+            home_team TEXT NOT NULL,
+            away_team TEXT NOT NULL,
+            home_score INTEGER,
+            away_score INTEGER,
+            outcome TEXT,
+            confidence REAL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
 def get_team_by_name(event_name, team_name):
     for team in EVENT_CONFIG[event_name]["teams"]:
         if team["name"] == team_name:
@@ -97,6 +130,8 @@ def compute_prediction(event_name, home_team_name, away_team_name):
     else:
         outcome = away_team["name"]
 
+    updated_at = datetime.utcnow().strftime("%H:%M:%S UTC")
+
     return {
         "home_team": home_team["name"],
         "away_team": away_team["name"],
@@ -106,7 +141,7 @@ def compute_prediction(event_name, home_team_name, away_team_name):
         "projected_score": {"home": home_score, "away": away_score},
         "confidence": round(max(home_win, draw, away_win) * 100, 1),
         "outcome": outcome,
-        "updated_at": datetime.utcnow().strftime("%H:%M:%S UTC"),
+        "updated_at": updated_at,
         "factors": {
             "home_attack": round(home_attack, 2),
             "away_attack": round(away_attack, 2),
@@ -115,6 +150,30 @@ def compute_prediction(event_name, home_team_name, away_team_name):
             "momentum": round((home_team["momentum"] + away_team["momentum"]) / 2, 2),
         },
     }
+
+
+def save_prediction(event_name, league, fixture_id, data):
+    connection = get_db()
+    connection.execute(
+        """
+        INSERT INTO predictions (event, league, fixture_id, home_team, away_team, home_score, away_score, outcome, confidence, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event_name,
+            league,
+            fixture_id,
+            data["home_team"],
+            data["away_team"],
+            data["projected_score"]["home"],
+            data["projected_score"]["away"],
+            data["outcome"],
+            data["confidence"],
+            data["updated_at"],
+        ),
+    )
+    connection.commit()
+    connection.close()
 
 
 @app.route("/")
@@ -155,9 +214,28 @@ def predict():
     result["event"] = EVENT_CONFIG[event_name]["label"]
     result["fixture_id"] = chosen_fixture["id"]
     result["league"] = chosen_fixture["league"]
+
+    save_prediction(event_name, chosen_fixture["league"], chosen_fixture["id"], result)
     return jsonify(result)
+
+
+@app.route("/api/history")
+def history():
+    event_name = request.args.get("event", "soccer")
+    connection = get_db()
+    rows = connection.execute(
+        "SELECT home_team, away_team, outcome, confidence, league, updated_at FROM predictions WHERE event = ? ORDER BY id DESC LIMIT 8",
+        (event_name,),
+    ).fetchall()
+    connection.close()
+    return jsonify({
+        "event": EVENT_CONFIG.get(event_name, EVENT_CONFIG["soccer"])["label"],
+        "history": [dict(row) for row in rows],
+    })
+
+
+init_db()
 
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-

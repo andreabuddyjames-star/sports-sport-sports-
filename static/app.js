@@ -104,6 +104,11 @@
           </div>
         </div>
       </section>
+
+      <section class="card history-panel">
+        <h3>Recent predictions</h3>
+        <div id="historyList" class="history-list"></div>
+      </section>
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>

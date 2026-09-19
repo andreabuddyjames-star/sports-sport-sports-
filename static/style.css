@@ -1,6 +1,7 @@
 const refreshBtn = document.getElementById('refreshBtn');
 const eventTypeSelect = document.getElementById('eventType');
 const fixtureListEl = document.getElementById('fixtureList');
+const historyListEl = document.getElementById('historyList');
 const eventTagEl = document.getElementById('eventTag');
 const homeTeamEl = document.getElementById('homeTeam');
 const awayTeamEl = document.getElementById('awayTeam');
@@ -51,6 +52,32 @@ async function loadFixtures() {
   });
 }
 
+async function loadHistory() {
+  const selectedEvent = eventTypeSelect.value || 'soccer';
+  const response = await fetch(`/api/history?event=${selectedEvent}`);
+  const data = await response.json();
+
+  historyListEl.innerHTML = '';
+
+  if (!data.history || data.history.length === 0) {
+    historyListEl.innerHTML = '<div class="history-empty">No predictions yet.</div>';
+    return;
+  }
+
+  data.history.forEach((item) => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+    row.innerHTML = `
+      <div>
+        <strong>${item.home_team}</strong> vs <strong>${item.away_team}</strong>
+      </div>
+      <div class="history-subtitle">${item.league || 'League'} • ${item.outcome}</div>
+      <div class="history-meta">${item.confidence}% confidence • ${item.updated_at}</div>
+    `;
+    historyListEl.appendChild(row);
+  });
+}
+
 async function fetchPrediction(fixtureId = selectedFixtureId) {
   const selectedEvent = eventTypeSelect.value || 'soccer';
   const params = new URLSearchParams({ event: selectedEvent });
@@ -79,6 +106,7 @@ async function fetchPrediction(fixtureId = selectedFixtureId) {
   momentumEl.textContent = data.factors.momentum;
 
   await loadFixtures();
+  await loadHistory();
 }
 
 refreshBtn.addEventListener('click', () => fetchPrediction());

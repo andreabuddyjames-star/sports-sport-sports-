@@ -81,10 +81,19 @@ h1 {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
 }
 
-.fixture-list {
+.fixture-list,
+.history-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.fixture-item,
+.history-item {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #e5e7eb;
+  border-radius: 12px;
 }
 
 .fixture-item {
@@ -93,10 +102,6 @@ h1 {
   align-items: flex-start;
   gap: 6px;
   text-align: left;
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  color: #e5e7eb;
-  border-radius: 12px;
   padding: 12px 14px;
   width: 100%;
   cursor: pointer;
@@ -107,15 +112,26 @@ h1 {
   background: rgba(30, 64, 175, 0.25);
 }
 
-.fixture-name {
-  font-weight: 700;
+.history-item {
+  padding: 12px 14px;
 }
 
+.history-subtitle,
+.history-meta,
 .fixture-meta,
 .league,
 .timestamp {
   color: #94a3b8;
   font-size: 0.85rem;
+}
+
+.history-empty {
+  color: #94a3b8;
+  padding: 10px 0;
+}
+
+.fixture-name {
+  font-weight: 700;
 }
 
 .spotlight {
@@ -193,7 +209,8 @@ h2 {
   margin: 20px 0 6px;
 }
 
-.insights {
+.insights,
+.history-panel {
   margin-top: 22px;
 }
 
