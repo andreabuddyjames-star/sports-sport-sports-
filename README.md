@@ -1,17 +1,45 @@
 # Sports Predictor
 
-A Flask/React sports prediction MVP with ESPN fixtures, live injury/news context, Open-Meteo weather data for soccer venues, SQLite prediction history, and an explainable Elo + Poisson model.
+Flask/React sports prediction MVP with ESPN fixtures, structured injury data, weather context, SQLite history, and an explainable Elo + Poisson model.
 
-## Run
+## Production-safe environment
+
+Copy `.env.example` to `.env` only for local development. Never commit `.env`, provider keys, database files, or deployment secrets. In production, configure the same variables through the hosting provider's secret/environment settings. Keep `FRONTEND_ORIGIN` restricted to the deployed frontend origin; do not use `*` in production.
+
+Provider priority:
+- Soccer injuries: API-Football when `API_FOOTBALL_KEY` is set; otherwise ESPN News fallback.
+- Weather: WeatherAPI.com when `WEATHER_API_KEY` is set; otherwise Open-Meteo.
+- Missing providers produce neutral, explicitly labeled factors.
+
+## Run and validate step-by-step
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
+cp .env.example .env
 python app.py
 ```
 
-The API runs at `http://localhost:5000`. In another terminal:
+Validate the API in this order:
+
+```bash
+curl -i http://localhost:5000/api/health
+curl -s http://localhost:5000/api/diagnostics
+curl -s 'http://localhost:5000/api/fixtures?event=soccer'
+curl -s 'http://localhost:5000/api/predict?event=soccer&fixture_id=soc-1'
+curl -s 'http://localhost:5000/api/history?event=soccer'
+```
+
+Check that health is `200`, diagnostics never exposes secret values, fixtures contain `source` and `refreshed_at`, predictions contain `live_factors` with source/timestamp fields, and history contains the saved prediction. Provider outages should return neutral factors rather than fail the prediction endpoint.
+
+Run tests:
+
+```bash
+pytest
+```
+
+## Frontend
 
 ```bash
 cd frontend
@@ -19,17 +47,4 @@ npm install
 npm run dev
 ```
 
-## Live data and model adjustments
-
-- `/api/fixtures` refreshes ESPN scoreboard fixtures and returns `refreshed_at`, venue, status, and start time.
-- `/api/predict` fetches recent ESPN news and flags conservative injury/suspension headlines for either team. It also queries Open-Meteo geocoding and current conditions for soccer venues when ESPN supplies a venue.
-- News and weather payloads include provider source labels and UTC timestamps. Unavailable providers produce clearly labeled neutral factors rather than fabricated data.
-- Injury headlines apply a capped scoring-strength penalty per team; high wind/precipitation applies a capped scoring dampener. These are transparent heuristics, not medical or betting advice.
-- Predictions persist `live_factors`, `factors_updated_at`, and `factors_sources` in SQLite. Existing databases are migrated automatically.
-- A background refresh thread refreshes fixtures every five minutes by default. Configure `FIXTURE_REFRESH_SECONDS` and `ENABLE_BACKGROUND_REFRESH`; `/api/fixtures` and `/api/predict` also refresh on demand.
-
-For production, use a persistent database and replace the demo/news heuristic with a licensed structured injury feed. Do not treat missing or unverified reports as confirmed injuries.
-
-## Deployment
-
-`render.yaml` uses `pip install -r requirements.txt` and `gunicorn app:app`. Set `FRONTEND_ORIGIN` and use persistent storage/database for production.
+Open `http://localhost:5173`. Select a fixture and verify the Team availability and Match forecast cards show provider labels, timestamps, team badges, forecast icon/condition, severity, and model impact.
