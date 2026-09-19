@@ -1,0 +1,36 @@
+{
+  "teams": {
+    "Lions": {"rating": 1540},
+    "Falcons": {"rating": 1495},
+    "Rockets": {"rating": 1515},
+    "Titans": {"rating": 1505},
+    "Bears": {"rating": 1530},
+    "Sharks": {"rating": 1500},
+    "Storm": {"rating": 1580},
+    "Celtics": {"rating": 1610},
+    "Hawks": {"rating": 1550},
+    "Blazers": {"rating": 1525},
+    "Knights": {"rating": 1490},
+    "Wave": {"rating": 1510}
+  },
+  "leagues": {
+    "Demo Premier League": {
+      "home_average": 1.52,
+      "away_average": 1.16,
+      "draw_rate": 0.26,
+      "draw_blend": 0.25
+    },
+    "Demo Cup": {
+      "home_average": 1.48,
+      "away_average": 1.12,
+      "draw_rate": 0.24,
+      "draw_blend": 0.2
+    },
+    "Demo NBA": {
+      "home_average": 113.5,
+      "away_average": 110.5,
+      "draw_rate": 0.005,
+      "draw_blend": 0
+    }
+  }
+}
