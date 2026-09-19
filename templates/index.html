@@ -13,11 +13,19 @@
           <p class="eyebrow">Realtime prediction dashboard</p>
           <h1>Sports Event Predictor</h1>
         </div>
-        <button id="refreshBtn">Refresh</button>
+        <div class="actions">
+          <select id="eventType">
+            {% for event in event_types %}
+            <option value="{{ event }}">{{ event.title() }}</option>
+            {% endfor %}
+          </select>
+          <button id="refreshBtn">Refresh</button>
+        </div>
       </header>
 
       <main class="grid">
         <section class="card spotlight">
+          <div class="event-tag" id="eventTag">Soccer</div>
           <div class="matchup">
             <div>
               <span class="label">Home</span>
@@ -59,8 +67,35 @@
         <section class="card">
           <h3>Prediction</h3>
           <p id="outcome" class="outcome">Waiting for update...</p>
+          <p class="timestamp" id="updatedAt">--</p>
         </section>
       </main>
+
+      <section class="card insights">
+        <h3>Live insights</h3>
+        <div class="insight-grid">
+          <div>
+            <span class="mini-label">Home attack</span>
+            <strong id="homeAttack">--</strong>
+          </div>
+          <div>
+            <span class="mini-label">Away attack</span>
+            <strong id="awayAttack">--</strong>
+          </div>
+          <div>
+            <span class="mini-label">Home defense</span>
+            <strong id="homeDefense">--</strong>
+          </div>
+          <div>
+            <span class="mini-label">Away defense</span>
+            <strong id="awayDefense">--</strong>
+          </div>
+          <div>
+            <span class="mini-label">Momentum</span>
+            <strong id="momentum">--</strong>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>

@@ -1,16 +1,17 @@
 # sports-sport-sports-
 
-A simple real-time sports event prediction dashboard prototype.
+A real-time sports event prediction dashboard prototype for soccer, basketball, and tennis matchups.
 
 ## What this project does
 
-This app simulates live sports match predictions and displays:
+This app simulates live event predictions and displays:
 
-- a matchup between two teams
+- a matchup between two competitors
 - projected score
 - win probabilities
 - confidence level
-- automatic refresh for a live dashboard feel
+- live-updating event selection
+- performance factors such as attack, defense, and momentum
 
 ## Stack
 
@@ -34,10 +35,10 @@ This app simulates live sports match predictions and displays:
 
 ## Notes
 
-This is an MVP starter for a real-time event prediction product. It can be extended with:
+This is an MVP starter for a real-time event prediction platform. It can be extended with:
 
 - real sports APIs
-- ML-based scoring
-- user authentication
+- a machine learning model
+- authentication and user accounts
 - database storage
-- live notifications
+- deployment to cloud hosting
