@@ -1,115 +1,134 @@
-from flask import Flask, render_template, jsonify, request
+from datetime import datetime, timezone
+import os
 import random
-from datetime import datetime
+import sqlite3
+
+import requests
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+from predictor import predict_match
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": os.getenv("FRONTEND_ORIGIN", "*")}})
+DB_PATH = os.getenv("DATABASE_PATH", os.path.join(app.root_path, "predictions.db"))
+API_TIMEOUT = 8
 
-EVENT_CONFIG = {
-    "soccer": {
-        "label": "Soccer",
-        "teams": [
-            {"name": "Lions", "attack": 1.18, "defense": 0.98, "momentum": 0.82},
-            {"name": "Rockets", "attack": 1.10, "defense": 1.04, "momentum": 0.73},
-            {"name": "Falcons", "attack": 1.25, "defense": 0.90, "momentum": 0.88},
-            {"name": "Sharks", "attack": 0.96, "defense": 1.12, "momentum": 0.71},
-            {"name": "Titans", "attack": 1.06, "defense": 1.06, "momentum": 0.76},
-            {"name": "Bears", "attack": 0.99, "defense": 1.16, "momentum": 0.70},
-        ],
-    },
-    "basketball": {
-        "label": "Basketball",
-        "teams": [
-            {"name": "Storm", "attack": 1.28, "defense": 0.95, "momentum": 0.86},
-            {"name": "Hawks", "attack": 1.17, "defense": 1.03, "momentum": 0.79},
-            {"name": "Knights", "attack": 1.22, "defense": 0.99, "momentum": 0.81},
-            {"name": "Wave", "attack": 1.09, "defense": 1.12, "momentum": 0.74},
-            {"name": "Blazers", "attack": 1.14, "defense": 1.05, "momentum": 0.77},
-            {"name": "Celtics", "attack": 1.20, "defense": 1.00, "momentum": 0.80},
-        ],
-    },
-    "tennis": {
-        "label": "Tennis",
-        "teams": [
-            {"name": "A. Wright", "attack": 1.30, "defense": 1.05, "momentum": 0.87},
-            {"name": "M. Ross", "attack": 1.24, "defense": 1.08, "momentum": 0.83},
-            {"name": "D. Patel", "attack": 1.18, "defense": 1.12, "momentum": 0.78},
-            {"name": "N. Silva", "attack": 1.16, "defense": 1.11, "momentum": 0.75},
-            {"name": "C. Nguyen", "attack": 1.21, "defense": 1.09, "momentum": 0.81},
-            {"name": "L. Brooks", "attack": 1.14, "defense": 1.15, "momentum": 0.74},
-        ],
-    },
+FALLBACK_FIXTURES = {
+    "soccer": [
+        {"id": "soc-1", "home": "Lions", "away": "Falcons", "league": "Demo Premier League"},
+        {"id": "soc-2", "home": "Rockets", "away": "Titans", "league": "Demo Cup"},
+        {"id": "soc-3", "home": "Bears", "away": "Sharks", "league": "Demo Championship"},
+    ],
+    "basketball": [
+        {"id": "bb-1", "home": "Storm", "away": "Celtics", "league": "Demo NBA"},
+        {"id": "bb-2", "home": "Hawks", "away": "Blazers", "league": "Demo Pacific Cup"},
+        {"id": "bb-3", "home": "Knights", "away": "Wave", "league": "Demo Conference"},
+    ],
+}
+
+ESPN_ENDPOINTS = {
+    "soccer": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
+    "basketball": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
 }
 
 
-def select_teams(event_name):
-    event = EVENT_CONFIG.get(event_name, EVENT_CONFIG["soccer"])
-    teams = event["teams"]
-    home_team = random.choice(teams)
-    away_team = random.choice([t for t in teams if t["name"] != home_team["name"]])
-    return home_team, away_team
+def db_connection():
+    connection = sqlite3.connect(DB_PATH)
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
-def compute_prediction(home_team, away_team):
-    home_advantage = 0.18
-    home_attack = home_team["attack"] * (1 + home_team["momentum"] * 0.25)
-    away_attack = away_team["attack"] * (1 + away_team["momentum"] * 0.25)
-    home_defense = home_team["defense"]
-    away_defense = away_team["defense"]
-
-    home_expected = max(0.4, (home_attack * 1.2) + home_advantage - (away_defense * 0.8))
-    away_expected = max(0.3, (away_attack * 1.1) - (home_defense * 0.7))
-
-    home_win = max(0.05, min(0.75, (home_expected / (home_expected + away_expected + 0.5))))
-    away_win = max(0.05, min(0.75, (away_expected / (home_expected + away_expected + 0.5))))
-    draw = max(0.08, 1 - home_win - away_win)
-
-    home_win = round(home_win, 3)
-    draw = round(draw, 3)
-    away_win = round(away_win, 3)
-
-    home_score = max(0, round(home_expected + random.uniform(-0.8, 1.2)))
-    away_score = max(0, round(away_expected + random.uniform(-0.8, 1.2)))
-
-    if home_score == away_score:
-        outcome = "Draw"
-    elif home_score > away_score:
-        outcome = home_team["name"]
-    else:
-        outcome = away_team["name"]
-
-    return {
-        "home_team": home_team["name"],
-        "away_team": away_team["name"],
-        "home_win_probability": home_win,
-        "draw_probability": draw,
-        "away_win_probability": away_win,
-        "projected_score": {"home": home_score, "away": away_score},
-        "confidence": round(max(home_win, draw, away_win) * 100, 1),
-        "outcome": outcome,
-        "updated_at": datetime.utcnow().strftime("%H:%M:%S UTC"),
-        "factors": {
-            "home_attack": round(home_attack, 2),
-            "away_attack": round(away_attack, 2),
-            "home_defense": round(home_defense, 2),
-            "away_defense": round(away_defense, 2),
-            "momentum": round((home_team["momentum"] + away_team["momentum"]) / 2, 2),
-        },
-    }
+def init_db():
+    with db_connection() as connection:
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event TEXT NOT NULL, fixture_id TEXT NOT NULL,
+                home_team TEXT NOT NULL, away_team TEXT NOT NULL,
+                outcome TEXT NOT NULL, confidence REAL NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
 
 
-@app.route("/")
-def index():
-    return render_template("index.html", event_types=sorted(EVENT_CONFIG.keys()))
+def normalize_event(event):
+    return event if event in {"soccer", "basketball"} else "soccer"
 
 
-@app.route("/api/predict")
+def live_fixtures(event):
+    endpoint = ESPN_ENDPOINTS.get(event)
+    if endpoint:
+        try:
+            response = requests.get(endpoint, timeout=API_TIMEOUT)
+            response.raise_for_status()
+            events = response.json().get("events", [])
+            fixtures = []
+            for item in events:
+                competitions = item.get("competitions", [])
+                competition = competitions[0] if competitions else {}
+                competitors = competition.get("competitors", [])
+                home = next((x for x in competitors if x.get("homeAway") == "home"), {})
+                away = next((x for x in competitors if x.get("homeAway") == "away"), {})
+                if home.get("team", {}).get("displayName") and away.get("team", {}).get("displayName"):
+                    fixtures.append({
+                        "id": f"espn-{item.get('id')}",
+                        "home": home["team"]["displayName"],
+                        "away": away["team"]["displayName"],
+                        "league": item.get("leagues", [{}])[0].get("name", "Live league"),
+                        "status": item.get("status", {}).get("type", {}).get("description", "Scheduled"),
+                        "source": "ESPN",
+                    })
+            if fixtures:
+                return fixtures
+        except (requests.RequestException, ValueError, KeyError):
+            pass
+
+    return [dict(fixture, source="demo") for fixture in FALLBACK_FIXTURES[event]]
+
+
+def fixture_by_id(event, fixture_id):
+    fixtures = live_fixtures(event)
+    return next((fixture for fixture in fixtures if fixture["id"] == fixture_id), None)
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"status": "ok", "time": datetime.now(timezone.utc).isoformat()})
+
+
+@app.get("/api/fixtures")
+def fixtures():
+    event = normalize_event(request.args.get("event", "soccer"))
+    return jsonify({"event": event, "fixtures": live_fixtures(event)})
+
+
+@app.get("/api/predict")
 def predict():
-    event_name = request.args.get("event", "soccer")
-    home_team, away_team = select_teams(event_name)
-    result = compute_prediction(home_team, away_team)
-    result["event"] = EVENT_CONFIG.get(event_name, EVENT_CONFIG["soccer"])["label"]
+    event = normalize_event(request.args.get("event", "soccer"))
+    fixture_id = request.args.get("fixture_id")
+    fixture = fixture_by_id(event, fixture_id) if fixture_id else None
+    fixture = fixture or random.choice(live_fixtures(event))
+    result = predict_match(event, fixture["home"], fixture["away"])
+    result.update({"event": event, "fixture_id": fixture["id"], "league": fixture["league"], "source": fixture["source"]})
+
+    with db_connection() as connection:
+        connection.execute(
+            "INSERT INTO predictions (event, fixture_id, home_team, away_team, outcome, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (event, fixture["id"], result["home_team"], result["away_team"], result["outcome"], result["confidence"], result["updated_at"]),
+        )
     return jsonify(result)
 
 
+@app.get("/api/history")
+def history():
+    event = normalize_event(request.args.get("event", "soccer"))
+    with db_connection() as connection:
+        rows = connection.execute("SELECT * FROM predictions WHERE event = ? ORDER BY id DESC LIMIT 20", (event,)).fetchall()
+    return jsonify({"event": event, "history": [dict(row) for row in rows]})
+
+
+init_db()
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")))
