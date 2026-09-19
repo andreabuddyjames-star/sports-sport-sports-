@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sports Event Predictor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <div>
+          <p class="eyebrow">Realtime prediction dashboard</p>
+          <h1>Sports Event Predictor</h1>
+        </div>
+        <button id="refreshBtn">Refresh</button>
+      </header>
+
+      <main class="grid">
+        <section class="card spotlight">
+          <div class="matchup">
+            <div>
+              <span class="label">Home</span>
+              <h2 id="homeTeam">--</h2>
+            </div>
+            <div class="versus">VS</div>
+            <div>
+              <span class="label">Away</span>
+              <h2 id="awayTeam">--</h2>
+            </div>
+          </div>
+          <div class="score-box">
+            <strong id="homeScore">0</strong>
+            <span>:</span>
+            <strong id="awayScore">0</strong>
+          </div>
+          <div class="confidence-wrap">
+            <span>Confidence</span>
+            <strong id="confidence">0%</strong>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Probability</h3>
+          <div class="probability-item">
+            <span>Home win</span>
+            <strong id="homeWin">0%</strong>
+          </div>
+          <div class="probability-item">
+            <span>Draw</span>
+            <strong id="drawProb">0%</strong>
+          </div>
+          <div class="probability-item">
+            <span>Away win</span>
+            <strong id="awayWin">0%</strong>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Prediction</h3>
+          <p id="outcome" class="outcome">Waiting for update...</p>
+        </section>
+      </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
