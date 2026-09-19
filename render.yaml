@@ -9,3 +9,7 @@ services:
         sync: false
       - key: DATABASE_PATH
         value: /opt/render/project/src/data/predictions.db
+      - key: ENABLE_BACKGROUND_REFRESH
+        value: "true"
+      - key: FIXTURE_REFRESH_SECONDS
+        value: "300"
